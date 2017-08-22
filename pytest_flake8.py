@@ -2,8 +2,10 @@
 
 import os
 import re
+from logging import getLogger
 
 from flake8.main import application
+getLogger('flake8').propagate = False
 
 import py
 

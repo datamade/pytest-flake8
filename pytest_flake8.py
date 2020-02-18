@@ -53,6 +53,7 @@ def pytest_configure(config):
         config._flake8showshource = config.getini("flake8-show-source")
         config._flake8statistics = config.getini("flake8-statistics")
         config._flake8exts = config.getini("flake8-extensions")
+        config.addinivalue_line('markers', "flake8: Tests which run flake8.")
         if hasattr(config, 'cache'):
             config._flake8mtimes = config.cache.get(HISTKEY, {})
 
@@ -88,6 +89,7 @@ class Flake8Item(pytest.Item, pytest.File):
     def __init__(self, path, parent, flake8ignore, maxlength,
                  maxcomplexity, showshource, statistics):
         super(Flake8Item, self).__init__(path, parent)
+        self._nodeid += "::FLAKE8"
         self.add_marker("flake8")
         self.flake8ignore = flake8ignore
         self.maxlength = maxlength
@@ -137,7 +139,7 @@ class Flake8Item(pytest.Item, pytest.File):
 
 
 class Ignorer:
-    def __init__(self, ignorelines, coderex=re.compile("[EW]\d\d\d")):
+    def __init__(self, ignorelines, coderex=re.compile(r"[EW]\d\d\d")):
         self.ignores = ignores = []
         for line in ignorelines:
             i = line.find("#")
@@ -157,7 +159,7 @@ class Ignorer:
             ignores.append((glob, ign))
 
     def __call__(self, path):
-        l = []
+        l = []  # noqa: E741
         for (glob, ignlist) in self.ignores:
             if not glob or path.fnmatch(glob):
                 if ignlist is None:
@@ -179,12 +181,17 @@ def check_file(path, flake8ignore, maxlength, maxcomplexity,
     if statistics:
         args += ['--statistics']
     app = application.Application()
+    app.parse_preliminary_options_and_args(args)
+    app.make_config_finder()
     app.find_plugins()
     app.register_plugin_options()
     app.parse_configuration_and_cli(args)
-    app.options.ignore = flake8ignore
+    if flake8ignore:
+        app.options.ignore = flake8ignore
     app.make_formatter()  # fix this
-    app.make_notifier()
+    if hasattr(app, 'make_notifier'):
+        # removed in flake8 3.7+
+        app.make_notifier()
     app.make_guide()
     app.make_file_checker_manager()
     app.run_checks([str(path)])
